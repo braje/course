@@ -1,11 +1,14 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE RebindableSyntax #-}
 
 module Course.Applicative(
   Applicative(..)
 , sequence
 , replicateA
 , filtering
+, return
+, fail
 ) where
 
 import Course.Core
@@ -152,3 +155,17 @@ instance Applicative [] where
 instance Applicative P.Maybe where
   pure =
     P.return
+
+return ::
+  Applicative f =>
+  a
+  -> f a
+return =
+  pure
+
+fail ::
+  Applicative f =>
+  Chars
+  -> f a
+fail =
+  error . hlist
