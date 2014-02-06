@@ -71,8 +71,8 @@ headOr ::
   a
   -> List a
   -> a
-headOr =
-  error "todo"
+headOr a Nil = a
+headOr _ (a:._) = a
 
 -- | The product of the elements of a list.
 --
@@ -85,7 +85,7 @@ product ::
   List Int
   -> Int
 product =
-  error "todo"
+  foldRight (*) 1
 
 -- | Sum the elements of the list.
 --
@@ -100,7 +100,7 @@ sum ::
   List Int
   -> Int
 sum =
-  error "todo"
+  foldRight (+) 0
 
 -- | Return the length of the list.
 --
@@ -112,7 +112,7 @@ length ::
   List a
   -> Int
 length =
-  error "todo"
+  foldRight ( \_ -> \acc -> acc+1 ) 0
 
 -- | Map the given function on each element of the list.
 --
@@ -126,8 +126,8 @@ map ::
   (a -> b)
   -> List a
   -> List b
-map =
-  error "todo"
+map f =
+  foldRight (\a -> \bs -> (f a) :. bs ) Nil
 
 -- | Return elements satisfying the given predicate.
 --
@@ -143,8 +143,8 @@ filter ::
   (a -> Bool)
   -> List a
   -> List a
-filter =
-  error "todo"
+filter f =
+  foldRight (\a -> \as -> if (f a) then (a :. as) else as ) Nil
 
 -- | Append two lists to a new list.
 --
@@ -162,8 +162,8 @@ filter =
   List a
   -> List a
   -> List a
-(++) =
-  error "todo"
+(++) Nil ys = ys
+(++) (x:.xs) ys = x :. (xs++ys)
 
 infixr 5 ++
 
@@ -181,7 +181,7 @@ flatten ::
   List (List a)
   -> List a
 flatten =
-  error "todo"
+  foldRight (++) Nil
 
 -- | Map a function then flatten to a list.
 --
@@ -197,8 +197,8 @@ flatMap ::
   (a -> List b)
   -> List a
   -> List b
-flatMap =
-  error "todo"
+flatMap f as =
+  flatten (map f as)
 
 -- | Convert a list of optional values to an optional list of values.
 --
@@ -226,7 +226,13 @@ seqOptional ::
   List (Optional a)
   -> Optional (List a)
 seqOptional =
-  error "todo"
+  let f :: (Optional a) -> Optional (List a) -> Optional (List a)
+      f Empty _ = Empty
+      f _ Empty = Empty
+      f (Full a) (Full as) = Full (a:.as)
+  in
+      foldRight f (Full Nil)
+ 
 
 -- | Find the first element in the list matching the predicate.
 --
@@ -248,8 +254,9 @@ find ::
   (a -> Bool)
   -> List a
   -> Optional a
-find =
-  error "todo"
+find _ Nil = Empty
+find f (x:.xs) = if (f x) then Full x else find f xs
+
 
 -- | Determine if the length of the given list is greater than 4.
 --
@@ -267,8 +274,12 @@ find =
 lengthGT4 ::
   List a
   -> Bool
-lengthGT4 =
-  error "todo"
+lengthGT4 ys =
+  let loop :: Int -> List a -> Bool 
+      loop 0 (_:._)  = True
+      loop _ Nil     = False
+      loop n (_:.xs) = loop (n-1) xs
+  in loop 4 ys
 
 -- | Reverse a list.
 --
@@ -282,7 +293,7 @@ reverse ::
   List a
   -> List a
 reverse =
-  error "todo"
+  foldLeft (\xs -> \x -> x:.xs) Nil
 
 -- | Produce an infinite `List` that seeds with the given value at its head,
 -- then runs the given function for subsequent elements
@@ -296,22 +307,22 @@ produce ::
   (a -> a)
   -> a
   -> List a
-produce =
-  error "todo"
+produce f x =
+  x :. produce f (f x)
 
 -- | Do anything other than reverse a list.
 --
 -- >>> notReverse Nil
 -- []
 --
--- prop> let types = x :: List Int in notReverse x ++ notReverse y == notReverse (y ++ x)
+-- prop> let types = x :: List Int in notReverse x ++ notReverse y == notReverse (x ++ y)
 --
 -- prop> let types = x :: Int in notReverse (x :. Nil) == x :. Nil
 notReverse ::
   List a
   -> List a
 notReverse =
-  error "todo"
+  id
 
 hlist ::
   List a
