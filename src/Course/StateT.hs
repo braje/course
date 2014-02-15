@@ -30,16 +30,20 @@ newtype StateT s f a =
 -- >>> runStateT ((+1) <$> (pure 2) :: StateT Int List Int) 0
 -- [(3,0)]
 instance Functor f => Functor (StateT s f) where
-  (<$>) =
-    error "todo"
+  (<$>) f sTa =
+    StateT {
+      runStateT = \s -> (\(x,y) -> (f x, y)) <$> (runStateT sTa s)
+    }
 
 -- | Implement the `Apply` instance for @StateT s f@ given a @Bind f@.
 --
 -- >>> runStateT (pure (+2) <*> ((pure 2) :: StateT Int List Int)) 0
 -- [(4,0)]
 instance Bind f => Apply (StateT s f) where
-  (<*>) =
-    error "todo"
+  (<*>) sTf sTa =
+    StateT {
+      runStateT = \s -> (( \(f,s1) -> ( (\(a,s2)-> (f a, s2) ) <$> (runStateT sTa s1) )) =<< (runStateT sTf s))
+    }
 
 -- | Implement the `Applicative` instance for @StateT s f@ given a @Applicative f@.
 --
@@ -49,8 +53,10 @@ instance Bind f => Apply (StateT s f) where
 -- >>> runStateT ((pure 2) :: StateT Int List Int) 0
 -- [(2,0)]
 instance Monad f => Applicative (StateT s f) where
-  pure =
-    error "todo"
+  pure x =
+    StateT {
+      runStateT = \s -> pure (x,s)
+    }
 
 -- | Implement the `Bind` instance for @StateT s f@ given a @Monad f@.
 -- Make sure the state value is passed through in `bind`.
@@ -58,8 +64,10 @@ instance Monad f => Applicative (StateT s f) where
 -- >>> runStateT ((const $ putT 2) =<< putT 1) 0
 -- ((),2)
 instance Monad f => Bind (StateT s f) where
-  (=<<) =
-    error "todo"
+  (=<<) sTf sTa =
+    StateT {
+      runStateT = \s -> ( \(a,s1) -> (runStateT (sTf a) s1) ) =<< (runStateT sTa s)
+    }
 
 instance Monad f => Monad (StateT s f) where
 
@@ -74,8 +82,10 @@ type State' s a =
 state' ::
   (s -> (a, s))
   -> State' s a
-state' =
-  error "todo"
+state' f =
+  StateT {
+    runStateT = \s -> Id $ f s
+  }
 
 -- | Provide an unwrapper for `State'` values.
 --
@@ -85,8 +95,8 @@ runState' ::
   State' s a
   -> s
   -> (a, s)
-runState' =
-  error "todo"
+runState' st s =
+  runId $ runStateT st s
 
 -- | Run the `StateT` seeded with `s` and retrieve the resulting state.
 execT ::
@@ -94,16 +104,16 @@ execT ::
   StateT s f a
   -> s
   -> f s
-execT =
-  error "todo"
+execT stT s =
+  snd <$> (runStateT stT s)
 
 -- | Run the `State` seeded with `s` and retrieve the resulting state.
 exec' ::
   State' s a
   -> s
   -> s
-exec' =
-  error "todo"
+exec' st s =
+  runId $ execT st s
 
 -- | Run the `StateT` seeded with `s` and retrieve the resulting value.
 evalT ::
@@ -111,16 +121,16 @@ evalT ::
   StateT s f a
   -> s
   -> f a
-evalT =
-  error "todo"
+evalT stT s =
+  fst <$> (runStateT stT s)
 
 -- | Run the `State` seeded with `s` and retrieve the resulting value.
 eval' ::
   State' s a
   -> s
   -> a
-eval' =
-  error "todo"
+eval' st s =
+  runId $ evalT st s
 
 -- | A `StateT` where the state also distributes into the produced value.
 --
@@ -130,7 +140,9 @@ getT ::
   Monad f =>
   StateT s f s
 getT =
-  error "todo"
+  StateT {
+    runStateT = \s -> pure (s,s)
+  }
 
 -- | A `StateT` where the resulting state is seeded with the given value.
 --
@@ -143,8 +155,10 @@ putT ::
   Monad f =>
   s
   -> StateT s f ()
-putT =
-  error "todo"
+putT s =
+  StateT {
+    runStateT = \_ -> pure ((), s)
+  }
 
 -- | Remove all duplicate elements in a `List`.
 --
@@ -153,8 +167,8 @@ distinct' ::
   (Ord a, Num a) =>
   List a
   -> List a
-distinct' =
-  error "todo"
+distinct' xs =
+  eval' (filtering (\x -> getT >>= (\set -> (\_ -> S.member x set) <$> putT (S.insert x set))) xs) S.empty
 
 -- | Remove all duplicate elements in a `List`.
 -- However, if you see a value greater than `100` in the list,
@@ -171,8 +185,13 @@ distinctF ::
   (Ord a, Num a) =>
   List a
   -> Optional (List a)
-distinctF =
-  error "todo"
+distinctF xs =
+    error "todo"
+--  evalT (filtering (\x ->
+--                    (getT :: StateT (S.Set a) (Optional) (S.Set a)) >>=
+--                      (\set ->
+--                        putT (S.insert x set) >>=
+--                          (\_ -> if x<100 then Empty else Full $ S.member x set))) xs) S.empty
 
 -- | An `OptionalT` is a functor of an `Optional` value.
 data OptionalT f a =
