@@ -181,17 +181,20 @@ distinct' xs =
 --
 -- >>> distinctF $ listh [1,2,3,2,1,101]
 -- Empty
+--
+-- >>> distinctF $ listh [1,2,3,2,1,101,5,4]
+-- Empty
 distinctF ::
   (Ord a, Num a) =>
   List a
   -> Optional (List a)
 distinctF xs =
-    error "todo"
---  evalT (filtering (\x ->
---                    (getT :: StateT (S.Set a) (Optional) (S.Set a)) >>=
---                      (\set ->
---                        putT (S.insert x set) >>=
---                          (\_ -> if x<100 then Empty else Full $ S.member x set))) xs) S.empty
+  evalT (filtering (\x ->
+                     if x>100 then StateT { runStateT = \_ -> Empty }
+                     else getT >>=
+                      (\set ->
+                        (\_ -> S.notMember x set) <$> putT (S.insert x set)))
+         xs) S.empty
 
 -- | An `OptionalT` is a functor of an `Optional` value.
 data OptionalT f a =
@@ -205,29 +208,43 @@ data OptionalT f a =
 -- >>> runOptionalT $ (+1) <$> OptionalT (Full 1 :. Empty :. Nil)
 -- [Full 2,Empty]
 instance Functor f => Functor (OptionalT f) where
-  (<$>) =
-    error "todo"
+  (<$>) f opTa =
+    OptionalT {
+      runOptionalT = (\oa -> f <$> oa) <$> (runOptionalT opTa)
+    }
+    
 
 -- | Implement the `Apply` instance for `OptionalT f` given a Apply f.
 --
 -- >>> runOptionalT $ OptionalT (Full (+1) :. Full (+2) :. Nil) <*> OptionalT (Full 1 :. Empty :. Nil)
 -- [Full 2,Empty,Full 3,Empty]
 instance Apply f => Apply (OptionalT f) where
-  (<*>) =
-    error "todo"
+  (<*>) opTf opTa =
+    OptionalT {
+      runOptionalT = (\oF -> case oF of
+                               Empty -> (\_ -> Empty)
+                               Full f -> (\oa -> f <$> oa)) <$> (runOptionalT opTf) <*> (runOptionalT opTa)
+    }
 
 -- | Implement the `Applicative` instance for `OptionalT f` given a Applicative f.
 instance Applicative f => Applicative (OptionalT f) where
-  pure =
-    error "todo"
+  pure a =
+    OptionalT {
+      runOptionalT = pure $ Full a
+    }
 
 -- | Implement the `Bind` instance for `OptionalT f` given a Monad f.
 --
 -- >>> runOptionalT $ (\a -> OptionalT (Full (a+1) :. Full (a+2) :. Nil)) =<< OptionalT (Full 1 :. Empty :. Nil)
 -- [Full 2,Full 3,Empty]
 instance Monad f => Bind (OptionalT f) where
-  (=<<) =
-    error "todo"
+  (=<<) fOpT opTa =
+    OptionalT {
+      runOptionalT = (runOptionalT opTa) >>= (\opa -> case opa of
+                                         Empty -> pure Empty
+                                         Full a -> runOptionalT $ fOpT a
+                                         )
+    }
 
 instance Monad f => Monad (OptionalT f) where
 
@@ -241,18 +258,16 @@ data Logger l a =
 -- >>> (+3) <$> Logger (listh [1,2]) 3
 -- Logger [1,2] 6
 instance Functor (Logger l) where
-  (<$>) =
-    error "todo"
+  (<$>) f (Logger logs a) = Logger logs $ f a
 
 -- | Implement the `Apply` instance for `Logger`.
 instance Apply (Logger l) where
-  (<*>) =
-    error "todo"
+  (<*>) (Logger lgs1 f) (Logger lgs2 a) = Logger (lgs1++lgs2) $ f a
 
 -- | Implement the `Applicative` instance for `Logger`.
 instance Applicative (Logger l) where
-  pure =
-    error "todo"
+  pure a =
+    Logger Nil a
 
 -- | Implement the `Bind` instance for `Logger`.
 -- The `bind` implementation must append log values to maintain associativity.
@@ -260,8 +275,9 @@ instance Applicative (Logger l) where
 -- >>> (\a -> Logger (listh [4,5]) (a+3)) =<< Logger (listh [1,2]) 3
 -- Logger [1,2,4,5] 6
 instance Bind (Logger l) where
-  (=<<) =
-    error "todo"
+  (=<<) f (Logger lgs a) =
+    case f a of
+      Logger lgs1 b -> Logger (lgs ++ lgs1) b
 
 instance Monad (Logger l) where
 
@@ -273,8 +289,8 @@ log1 ::
   l
   -> a
   -> Logger l a
-log1 =
-  error "todo"
+log1 l a =
+  Logger (l:.Nil) a
 
 -- | Remove all duplicate integers from a list. Produce a log as you go.
 -- If there is an element above 100, then abort the entire computation and produce no result.
@@ -294,5 +310,17 @@ distinctG ::
   (Integral a, Show a) =>
   List a
   -> Logger Chars (Optional (List a))
-distinctG =
-  error "todo"
+distinctG xs =
+  let lgevn x = if even x
+                then log1 ("even number: " ++ listh (show x))
+                else Logger Nil
+  in
+   runOptionalT $ evalT (filtering
+           (\x ->
+             if x>100 then StateT { runStateT = \_ -> OptionalT {
+                                       runOptionalT = log1 ("aborting > 100: " ++ listh (show x)) Empty
+                                   }}
+             else getT >>= (\set -> StateT {
+                               runStateT = \_ -> OptionalT {
+                                  runOptionalT = lgevn x (Full (S.notMember x set, S.insert x set))
+                                  }})) xs) S.empty
