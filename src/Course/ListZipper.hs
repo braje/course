@@ -475,10 +475,10 @@ nth ::
   Int
   -> ListZipper a
   -> MaybeListZipper a
-nth n z@(ListZipper ls x rs)
+nth n z@(ListZipper ls _ rs)
   | n == 0 = moveLeftN (length ls) z
   | n <= (length ls) = moveLeftN (length ls - n) z
-  | n < (length ls + length rs + 1) = moveRightN (n - length ls - 1) z
+  | n <= (length ls + length rs) = moveRightN (n - length ls) z
   | otherwise = IsNotZ
 
 -- | Return the absolute position of the current focus in the zipper.
@@ -526,8 +526,8 @@ start z@ (ListZipper ls _ _) =
 deletePullLeft ::
   ListZipper a
   -> MaybeListZipper a
-deletePullLeft (ListZipper _ _ Nil) = IsNotZ
-deletePullLeft (ListZipper ls x (r:.rs)) = IsZ $ ListZipper ls r rs
+deletePullLeft (ListZipper Nil _ _) = IsNotZ
+deletePullLeft (ListZipper (l:.ls) _ rs) = IsZ $ ListZipper ls l rs
 
 -- | Delete the current focus and pull the right values to take the empty position.
 --
@@ -539,8 +539,8 @@ deletePullLeft (ListZipper ls x (r:.rs)) = IsZ $ ListZipper ls r rs
 deletePullRight ::
   ListZipper a
   -> MaybeListZipper a
-deletePullRight (ListZipper Nil _ _) = IsNotZ
-deletePullRight (ListZipper (l:.ls) x rs) = IsZ $ ListZipper ls l rs
+deletePullRight (ListZipper _ _ Nil) = IsNotZ
+deletePullRight (ListZipper ls _ (r:.rs)) = IsZ $ ListZipper ls r rs
 
 
 -- | Insert at the current focus and push the left values to make way for the new position.
@@ -581,8 +581,11 @@ insertPushRight y (ListZipper ls x rs) =
 -- >>> zipper [(+2), (+10)] (*2) [(*3), (4*), (5+)] <*> zipper [3,2,1] 4 [5,6,7]
 -- [5,12] >8< [15,24,12]
 instance Apply ListZipper where
-  (<*>) =
-    error "todo"
+  (<*>) (ListZipper lfs ff rfs) (ListZipper ls xx rs) =
+    let fapp Nil _ = Nil
+        fapp _ Nil = Nil
+        fapp (f:.fs) (x:.xs) = f x :. fapp fs xs
+    in  ListZipper (fapp lfs ls) (ff xx) (fapp rfs rs)
 
 -- | Implement the `Apply` instance for `MaybeListZipper`.
 --
@@ -635,8 +638,14 @@ instance Applicative MaybeListZipper where
 -- >>> id <<= (zipper [2,1] 3 [4,5])
 -- [[1] >2< [3,4,5],[] >1< [2,3,4,5]] >[2,1] >3< [4,5]< [[3,2,1] >4< [5],[4,3,2,1] >5< []]
 instance Extend ListZipper where
-  (<<=) =
-    error "todo"
+  (<<=) f z =
+    let unfl lz = case moveLeft lz of
+          IsNotZ -> Empty
+          IsZ zz -> Full (f zz,zz)
+        unfr lz = case moveRight lz of
+          IsNotZ -> Empty
+          IsZ zz -> Full (f zz,zz)
+    in ListZipper (unfoldr unfl z) (f z) (unfoldr unfr z)
 
 -- | Implement the `Extend` instance for `MaybeListZipper`.
 -- This instance will use the `Extend` instance for `ListZipper`.
@@ -648,8 +657,8 @@ instance Extend ListZipper where
 -- >>> id <<= (IsZ (zipper [2,1] 3 [4,5]))
 -- [[1] >2< [3,4,5],[] >1< [2,3,4,5]] >[2,1] >3< [4,5]< [[3,2,1] >4< [5],[4,3,2,1] >5< []]
 instance Extend MaybeListZipper where
-  (<<=) =
-    error "todo"
+  (<<=) _ IsNotZ = IsNotZ
+  (<<=) f (IsZ z) = IsZ $ (\lz -> f $ IsZ lz) <<= z
 
 -- | Implement the `Comonad` instance for `ListZipper`.
 -- This implementation returns the current focus of the zipper.
@@ -670,8 +679,8 @@ instance Comonad ListZipper where
 -- >>> traverse id (zipper [Full 1, Full 2, Full 3] (Full 4) [Empty, Full 6, Full 7])
 -- Empty
 instance Traversable ListZipper where
-  traverse =
-    error "todo"
+  traverse f (ListZipper ls x rs) =
+    pure ListZipper <*> (traverse f ls) <*> f x <*> (traverse f rs)
 
 -- | Implement the `Traversable` instance for `MaybeListZipper`.
 --
@@ -683,8 +692,8 @@ instance Traversable ListZipper where
 -- >>> traverse id (IsZ (zipper [Full 1, Full 2, Full 3] (Full 4) [Full 5, Full 6, Full 7]))
 -- Full [1,2,3] >4< [5,6,7]
 instance Traversable MaybeListZipper where
-  traverse =
-    error "todo"
+  traverse _ IsNotZ = pure IsNotZ
+  traverse f (IsZ z) = pure IsZ <*> traverse f z
 
 -----------------------
 -- SUPPORT LIBRARIES --
