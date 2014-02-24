@@ -1,17 +1,17 @@
-{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE RebindableSyntax    #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE RebindableSyntax #-}
 
 module Course.MoreParser where
 
-import Course.Core
-import Course.Parser
-import Course.List
-import Course.Optional
-import Course.Applicative
-import Course.Apply
-import Course.Bind
-import Course.Traversable
+import           Course.Applicative
+import           Course.Apply
+import           Course.Bind
+import           Course.Core
+import           Course.List
+import           Course.Optional
+import           Course.Parser
+import           Course.Traversable
 
 -- $setup
 -- >>> :set -XOverloadedStrings
@@ -33,7 +33,7 @@ P p <.> i =
 spaces ::
   Parser Chars
 spaces =
-  error "todo"
+  list space
 
 -- | Write a function that applies the given parser, then parses 0 or more spaces,
 -- then produces the result of the original parser.
@@ -43,7 +43,7 @@ tok ::
   Parser a
   -> Parser a
 tok =
-  error "todo"
+  (=<<) (\a -> spaces >>> valueParser a )
 
 -- | Write a function that parses the given char followed by 0 or more spaces.
 --
@@ -51,8 +51,8 @@ tok =
 charTok ::
   Char
   -> Parser Char
-charTok =
-  error "todo"
+charTok c =
+  tok $ is c
 
 -- | Write a parser that parses a comma ',' followed by 0 or more spaces.
 --
@@ -60,7 +60,7 @@ charTok =
 commaTok ::
   Parser Char
 commaTok =
-  error "todo"
+  tok $ is ','
 
 -- | Write a parser that parses either a double-quote or a single-quote.
 --
@@ -77,7 +77,7 @@ commaTok =
 quote ::
   Parser Char
 quote =
-  error "todo"
+  is '\'' ||| is '\"'
 
 -- | Write a function that parses the given string (fails otherwise).
 --
@@ -92,7 +92,7 @@ string ::
   Chars
   -> Parser Chars
 string =
-  error "todo"
+  traverse is
 
 -- | Write a function that parsers the given string, followed by 0 or more spaces.
 --
@@ -107,7 +107,7 @@ stringTok ::
   Chars
   -> Parser Chars
 stringTok =
-  error "todo"
+  tok . string
 
 -- | Write a function that tries the given parser, otherwise succeeds by producing the given value.
 --
@@ -122,8 +122,8 @@ option ::
   a
   -> Parser a
   -> Parser a
-option =
-  error "todo"
+option a p =
+  p ||| (valueParser a)
 
 -- | Write a parser that parses 1 or more digits.
 --
@@ -137,7 +137,7 @@ option =
 digits1 ::
   Parser Chars
 digits1 =
-  error "todo"
+  many1 digit
 
 -- | Write a function that parses one of the characters in the given string.
 --
@@ -151,8 +151,8 @@ digits1 =
 oneof ::
   Chars
   -> Parser Char
-oneof =
-  error "todo"
+oneof str =
+  satisfy (\c -> elem c str)
 
 -- | Write a function that parses any character, but fails if it is in the given string.
 --
@@ -166,8 +166,8 @@ oneof =
 noneof ::
   Chars
   -> Parser Char
-noneof =
-  error "todo"
+noneof str =
+  satisfy (\c -> notElem c str)
 
 -- | Write a function that applies the first parser, runs the third parser keeping the result,
 -- then runs the second parser and produces the obtained result.
@@ -190,8 +190,8 @@ between ::
   -> Parser c
   -> Parser a
   -> Parser a
-between =
-  error "todo"
+between p1 p2 p3 =
+  p1 >> p3 >>= (\res -> p2 >> valueParser res)
 
 -- | Write a function that applies the given parser in between the two given characters.
 --
@@ -213,8 +213,8 @@ betweenCharTok ::
   -> Char
   -> Parser a
   -> Parser a
-betweenCharTok =
-  error "todo"
+betweenCharTok c1 c2 p =
+  between (is c1) (is c2) p
 
 -- | Write a function that parses the character 'u' followed by 4 hex digits and return the character value.
 --
@@ -237,7 +237,9 @@ betweenCharTok =
 hex ::
   Parser Char
 hex =
-  error "todo"
+  is 'u' >>
+    (sequenceParser $ replicate 4 (satisfy isHexDigit)) >>=
+      (\hx -> (mapOptional (valueParser . chr) (readHex hx)) ?? failed)
 
 -- | Write a function that produces a non-empty list of values coming off the given parser (which must succeed at least once),
 -- separated by the second given parser.
@@ -259,8 +261,8 @@ sepby1 ::
   Parser a
   -> Parser s
   -> Parser (List a)
-sepby1 =
-  error "todo"
+sepby1 pa ps =
+  pa >>= (\a -> (list $ ps >> pa) >>= (\as -> valueParser (a:.as)))
 
 -- | Write a function that produces a list of values coming off the given parser,
 -- separated by the second given parser.
@@ -282,8 +284,8 @@ sepby ::
   Parser a
   -> Parser s
   -> Parser (List a)
-sepby =
-  error "todo"
+sepby pa ps =
+  (sepby1 pa ps) ||| valueParser Nil
 
 -- | Write a parser that asserts that there is no remaining input.
 --
@@ -295,7 +297,7 @@ sepby =
 eof ::
   Parser ()
 eof =
-  error "todo"
+  P { parse = \inp -> if isEmpty inp then Result Nil () else ErrorResult $ ExpectedEof inp }
 
 -- | Write a parser that produces a characer that satisfies all of the given predicates.
 --
@@ -318,8 +320,8 @@ eof =
 satisfyAll ::
   List (Char -> Bool)
   -> Parser Char
-satisfyAll =
-  error "todo"
+satisfyAll fs =
+  satisfy (\c -> and $ sequence fs c)
 
 -- | Write a parser that produces a characer that satisfies any of the given predicates.
 --
@@ -339,8 +341,8 @@ satisfyAll =
 satisfyAny ::
   List (Char -> Bool)
   -> Parser Char
-satisfyAny =
-  error "todo"
+satisfyAny fs =
+  satisfy (\c -> or $ sequence fs c)
 
 -- | Write a parser that parses between the two given characters, separated by a comma character ','.
 --
@@ -368,5 +370,5 @@ betweenSepbyComma ::
   -> Char
   -> Parser a
   -> Parser (List a)
-betweenSepbyComma =
-  error "todo"
+betweenSepbyComma c1 c2 p =
+  betweenCharTok c1 c2 $ sepby p (is ',')
