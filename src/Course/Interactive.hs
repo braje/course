@@ -1,17 +1,17 @@
-{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE OverloadedStrings #-}
 
 module Course.Interactive where
 
-import Course.Core
-import Course.Functor
-import Course.Applicative
-import Course.Bind
-import Course.Monad
-import Course.Traversable
-import Course.List
-import Course.Optional
+import           Course.Applicative
+import           Course.Bind
+import           Course.Core
+import           Course.Functor
+import           Course.List
+import           Course.Monad
+import           Course.Optional
+import           Course.Traversable
 
 -- | Eliminates any value over which a functor is defined.
 vooid ::
@@ -84,7 +84,8 @@ data Op =
 convertInteractive ::
   IO ()
 convertInteractive =
-  error "todo"
+  putStrLn "Please enter a string to convert to upper case:" >-
+  getLine >>= (\line -> putStrLn $ toUpper <$> line)
 
 -- |
 --
@@ -112,7 +113,11 @@ convertInteractive =
 reverseInteractive ::
   IO ()
 reverseInteractive =
-  error "todo"
+  putStrLn "Please enter a file name to reverse:" >-
+  getLine >>= (\f -> readFile f) >>=
+  (\contents ->
+    putStrLn "Please enter a file name to write back to:" >-
+    getLine >>= (\out -> writeFile out (reverse contents)))
 
 -- |
 --
@@ -138,7 +143,14 @@ reverseInteractive =
 encodeInteractive ::
   IO ()
 encodeInteractive =
-  error "todo"
+  let encode c = if c==' ' then "%20"
+                 else if c=='\t' then "%09"
+                      else if c=='"' then "%22"
+                           else (c:.Nil)
+  in
+   putStr "Please enter a string to url-encode:" >-
+   ((\url -> encode <$> url) <$> getLine) >>=
+   (\encUrl -> putStrLn (join encUrl))
 
 interactive ::
   IO ()
