@@ -268,7 +268,7 @@ satisfy ::
   (Char -> Bool)
   -> Parser Char
 satisfy f =
-  fbindParser character (\c -> if f c then valueParser c else failed)
+  fbindParser character (\c -> if f c then valueParser c else result $ ErrorResult (UnexpectedChar c))
 
 -- | Return a parser that produces the given character but fails if
 --

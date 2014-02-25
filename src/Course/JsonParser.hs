@@ -1,19 +1,19 @@
-{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE OverloadedStrings #-}
 
 module Course.JsonParser where
 
-import Course.Core
-import Course.Parser
-import Course.MoreParser
-import Course.JsonValue
-import Course.Functor
-import Course.Apply
-import Course.Applicative
-import Course.Bind
-import Course.List
-import Course.Optional
+import           Course.Applicative
+import           Course.Apply
+import           Course.Bind
+import           Course.Core
+import           Course.Functor
+import           Course.JsonValue
+import           Course.List
+import           Course.MoreParser
+import           Course.Optional
+import           Course.Parser
 
 -- $setup
 -- >>> :set -XOverloadedStrings
@@ -48,7 +48,8 @@ import Course.Optional
 jsonString ::
   Parser Chars
 jsonString =
-  error "todo"
+  let ctrl = is '\\' >>= (\bkslash -> (oneof "\\/bfnrt" ||| hex) >>= (\c -> valueParser c))
+  in  betweenCharTok '"' '"' (list $ ctrl ||| (satisfy isAlphaNum )) -- todo this isn't quite right...
 
 -- | Parse a JSON rational.
 --
@@ -77,7 +78,13 @@ jsonString =
 jsonNumber ::
   Parser Rational
 jsonNumber =
-  error "todo"
+  let wholeFrac = (is '-' >>= (\sgn -> many1 digit >>= (\num -> valueParser (sgn:.num)))) ||| (list digit)
+      fracParser  = (is '.' >>= (\dot -> digits1 >>= (\frac -> valueParser (dot:.frac)))) ||| (valueParser ".")
+  in wholeFrac >>=
+      (\whole -> fracParser >>= (\frac -> valueParser (whole ++ frac))) >>=
+        (\decimal -> case readFloats decimal of
+                       Empty -> failed
+                       Full (a,_) -> valueParser a)
 
 -- | Parse a JSON true literal.
 --
@@ -91,7 +98,7 @@ jsonNumber =
 jsonTrue ::
   Parser Chars
 jsonTrue =
-  error "todo"
+  stringTok "true"
 
 -- | Parse a JSON false literal.
 --
@@ -105,7 +112,7 @@ jsonTrue =
 jsonFalse ::
   Parser Chars
 jsonFalse =
-  error "todo"
+  stringTok "false"
 
 -- | Parse a JSON null literal.
 --
@@ -119,7 +126,7 @@ jsonFalse =
 jsonNull ::
   Parser Chars
 jsonNull =
-  error "todo"
+  stringTok "null"
 
 -- | Parse a JSON array.
 --
@@ -142,7 +149,7 @@ jsonNull =
 jsonArray ::
   Parser (List JsonValue)
 jsonArray =
-  error "todo"
+  betweenSepbyComma '[' ']' jsonValue
 
 -- | Parse a JSON object.
 --
@@ -162,7 +169,9 @@ jsonArray =
 jsonObject ::
   Parser Assoc
 jsonObject =
-  error "todo"
+  betweenSepbyComma '{' '}' (
+    spaces >> jsonString >>=
+      (\key -> spaces >> charTok ':' >> jsonValue >>= (\value -> spaces >> valueParser (key,value))))
 
 -- | Parse a JSON value.
 --
@@ -179,7 +188,15 @@ jsonObject =
 jsonValue ::
   Parser JsonValue
 jsonValue =
-   error "todo"
+  let jNull = (\_ -> JsonNull) <$> jsonNull
+      jTrue = (\_ -> JsonTrue) <$> jsonTrue
+      jFals = (\_ -> JsonFalse) <$> jsonFalse
+      jStr  = JsonString <$> jsonString
+      jObj  = JsonObject <$> jsonObject
+      jArr  = JsonArray <$> jsonArray
+      jNum  = (\rat -> JsonRational False rat) <$> jsonNumber
+  in
+   spaces >> ( jNull ||| jTrue ||| jFals ||| jStr ||| jObj ||| jArr ||| jNum )
 
 -- | Read a file into a JSON value.
 --
@@ -187,5 +204,5 @@ jsonValue =
 readJsonValue ::
   Filename
   -> IO (ParseResult JsonValue)
-readJsonValue =
-  error "todo"
+readJsonValue fname =
+  (\contents -> parse jsonValue contents) <$> (readFile fname)

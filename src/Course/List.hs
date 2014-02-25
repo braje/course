@@ -1,7 +1,7 @@
-{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE FlexibleInstances   #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE FlexibleInstances #-}
 
 -- + Complete the 10 exercises below by filling out the function bodies.
 --   Replace the function bodies (error "todo") with an appropriate solution.
@@ -12,11 +12,11 @@
 
 module Course.List where
 
-import Course.Core
-import Course.Optional
+import           Course.Core
+import           Course.Optional
+import qualified Numeric            as N
+import qualified Prelude            as P
 import qualified System.Environment as E
-import qualified Prelude as P
-import qualified Numeric as N
 
 
 -- $setup
@@ -203,7 +203,7 @@ flatMap f as =
 
 -- | Convert a list of optional values to an optional list of values.
 --
--- * If the list contains all `Full` values, 
+-- * If the list contains all `Full` values,
 -- then return `Full` list of values.
 --
 -- * If the list contains one or more `Empty` values,
@@ -233,7 +233,7 @@ seqOptional =
       f (Full a) (Full as) = Full (a:.as)
   in
       foldRight f (Full Nil)
- 
+
 
 -- | Find the first element in the list matching the predicate.
 --
@@ -276,7 +276,7 @@ lengthGT4 ::
   List a
   -> Bool
 lengthGT4 ys =
-  let loop :: Int -> List a -> Bool 
+  let loop :: Int -> List a -> Bool
       loop 0 (_:._)  = True
       loop _ Nil     = False
       loop n (_:.xs) = loop (n-1) xs
